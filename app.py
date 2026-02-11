@@ -1,95 +1,109 @@
 import streamlit as st
+import pandas as pd
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Profesyonel Parfüm Laboratuvarı", page_icon="🧪", layout="centered")
+st.set_page_config(page_title="Parfüm Maliyet Uzmanı", page_icon="🧪", layout="wide")
 
-# --- YAN MENÜ (Maliyet Ayarları) ---
+# --- YAN MENÜ (AYARLAR) ---
 with st.sidebar:
-    st.header("⚙️ Maliyet ve Oran Ayarları")
-    st.info("Fiyatlar değişirse buradan güncelleyebilirsin.")
+    st.header("⚙️ Üretim Ayarları")
     
-    esans_paket_gr = st.number_input("Esans Paket Gramajı (gr)", value=25.0)
-    alkol_litre_fiyat = st.number_input("Alkol Litre Fiyatı (TL)", value=250.0)
-    saf_su_litre_fiyat = st.number_input("Saf Su Litre Fiyatı (TL)", value=10.0) # Su ucuzdur ama ekleyelim
-    sise_maliyet = st.number_input("Boş Şişe + Kutu Maliyeti (TL)", value=75.0)
+    st.subheader("💲 Kur Bilgisi")
+    dolar_kuru = st.number_input("Dolar Kuru (TL)", value=43.64, step=0.10, format="%.2f")
     
     st.divider()
-    su_orani = st.slider("Karışımdaki Su Oranı (%)", 0, 10, 5) # Varsayılan %5
+    
+    st.subheader("📦 Sabit Giderler")
+    kutu_maliyet = st.number_input("Kutu Maliyeti (TL)", value=15.0)
+    etiket_maliyet = st.number_input("Etiket Maliyeti (TL)", value=2.0)
+    
+    st.divider()
+    
+    st.subheader("🛢️ Hammadde")
+    alkol_litre = st.number_input("Alkol Litre (TL)", value=250.0)
+    saf_su_litre = st.number_input("Saf Su Litre (TL)", value=10.0)
+    
+    st.divider()
+    
+    st.subheader("⚗️ Oranlar")
+    esans_orani = st.slider("Esans Oranı (%)", 10, 40, 25)
+    su_orani = st.slider("Su Oranı (%)", 0, 10, 5)
 
-# --- VERİ TABANI (İsim Odaklı) ---
-# "Parfüm Adı": {"kod": "Uxxx", "fiyat": Paket Fiyatı (TL), "oran": Esans Oranı (%)}
-parfumler = {
-    "Guerlain - Neroli Oudrenoir": {"kod": "U345", "fiyat": 839.36, "oran": 25},
-    "Initio - Narcotic Delight": {"kod": "U344", "fiyat": 500.44, "oran": 25},
-    "Creed - Delphinus": {"kod": "U343", "fiyat": 532.12, "oran": 25},
-    "Clive Christian - Matsukita": {"kod": "U342", "fiyat": 807.69, "oran": 30},
-    "Afnan - 9pm Rebel": {"kod": "U341", "fiyat": 383.03, "oran": 20},
-    "Tiziana Terenzi - Kirke Overdose": {"kod": "U340", "fiyat": 545.08, "oran": 25},
-    "Essential Parfums - Bois Imperial": {"kod": "FR19", "fiyat": 630.86, "oran": 20},
-    "Nishane - Shem": {"kod": "FR9", "fiyat": 814.07, "oran": 25},
-    "Nishane - Hundred Silent Ways": {"kod": "FR8", "fiyat": 844.74, "oran": 25},
-    "By Kilian - Angel's Share": {"kod": "U306", "fiyat": 423.47, "oran": 25},
-    "Tom Ford - Oud Wood": {"kod": "U190", "fiyat": 194.35, "oran": 22},
-    "Parfums De Marly - Layton": {"kod": "U133", "fiyat": 191.15, "oran": 22},
-    "MFK - Baccarat Rouge 540 Extrait": {"kod": "U70", "fiyat": 191.50, "oran": 25},
-    "Jo Malone - Wood Sage & Sea Salt": {"kod": "U56", "fiyat": 183.98, "oran": 18},
-    "Creed - Aventus (Muadil)": {"kod": "U100", "fiyat": 250.00, "oran": 25} 
-}
+# --- ANA EKRAN ---
+st.title("🧪 Parfüm Maliyet Hesaplayıcı v8.0")
+st.write("Excel (.xlsx) veya CSV dosyalarınızı aşağıdaki alana sürükleyin.")
 
-# --- ANA EKRAN TASARIMI ---
-st.title("🧪 Parfüm Laboratuvarı")
-st.write("Profesyonel üretim reçetesi ve maliyet hesaplayıcı.")
+# DOSYA YÜKLEME ALANI
+yuklenenler = st.file_uploader("Dosyaları Buraya Bırakın", type=['csv', 'xlsx'], accept_multiple_files=True)
 
-# 1. Parfüm Seçimi (İsim Listesi)
-secilen_isim = st.selectbox("Hangi parfümü üreteceksin?", list(parfumler.keys()))
-p = parfumler[secilen_isim]
+if yuklenenler:
+    df_list = []
+    
+    for dosya in yuklenenler:
+        try:
+            if dosya.name.endswith('.csv'):
+                df = pd.read_csv(dosya)
+            else:
+                df = pd.read_excel(dosya, engine='openpyxl')
+            df_list.append(df)
+        except Exception as e:
+            st.error(f"{dosya.name} dosyası okunurken hata oluştu: {e}")
 
-# Seçilen parfümün detaylarını göster
-st.caption(f"📌 Kod: {p['kod']} | Önerilen Esans: %{p['oran']} | Paket Fiyatı: {p['fiyat']} TL")
-
-# 2. Şişe Boyutu
-sise_ml = st.slider("Hedeflenen Şişe Boyutu (ml)", min_value=10, max_value=100, value=50, step=5)
-
-# --- HESAPLAMA MOTORU ---
-if st.button("REÇETEYİ OLUŞTUR", type="primary"):
-    
-    # A. Miktar Hesaplamaları
-    esans_ml = (sise_ml * p["oran"]) / 100
-    su_ml = (sise_ml * su_orani) / 100
-    alkol_ml = sise_ml - (esans_ml + su_ml)
-    
-    # B. Maliyet Hesaplamaları
-    # Esans maliyeti: (Gereken ML * Paket Fiyatı) / Paket Gramajı
-    esans_maliyeti = esans_ml * (p["fiyat"] / esans_paket_gr)
-    
-    # Alkol maliyeti: (Gereken ML / 1000) * Litre Fiyatı
-    alkol_maliyeti = (alkol_ml / 1000) * alkol_litre_fiyat
-    
-    # Su maliyeti
-    su_maliyeti = (su_ml / 1000) * saf_su_litre_fiyat
-    
-    # Toplam
-    toplam_maliyet = esans_maliyeti + alkol_maliyeti + su_maliyeti + sise_maliyet
-
-    # --- SONUÇ EKRANI ---
-    st.markdown("---")
-    st.subheader(f"🧴 {secilen_isim} - {sise_ml} ml Reçetesi")
-    
-    # Sonuçları 4 kolon halinde göster
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("🔸 Esans", f"{esans_ml:.1f} ml", f"{esans_maliyeti:.1f} TL")
-    with col2:
-        st.metric("🔹 Saf Su", f"{su_ml:.1f} ml", f"%{su_orani}")
-    with col3:
-        st.metric("💧 Alkol", f"{alkol_ml:.1f} ml", f"{alkol_maliyeti:.1f} TL")
-    with col4:
-        st.metric("📦 Şişe", "1 Adet", f"{sise_maliyet} TL")
-    
-    # Büyük Toplam
-    st.success(f"💰 **TOPLAM MALİYET: {toplam_maliyet:.2f} TL**")
-    
-    # Kar Analizi (Opsiyonel Bilgi)
-    tavsiye_satis = toplam_maliyet * 3  # Örnek: Maliyetin 3 katı
-    st.info(f"💡 Tavsiye: Bu ürünü en az **{tavsiye_satis:.0f} TL**'ye satmalısın. (x3 Marj)")
+    if df_list:
+        ana_tablo = pd.concat(df_list, ignore_index=True)
+        ana_tablo.columns = ana_tablo.columns.str.strip()
+        
+        kolon_marka = 'BRAND'
+        kolon_tip = 'TYPE'
+        kolon_fiyat = 'FOB PRICE(US$/KG)'
+        
+        if kolon_marka in ana_tablo.columns and kolon_fiyat in ana_tablo.columns:
+            ana_tablo['TAM_AD'] = ana_tablo[kolon_marka].astype(str) + " - " + ana_tablo[kolon_tip].astype(str)
+            ana_tablo[kolon_fiyat] = ana_tablo[kolon_fiyat].astype(str).str.replace('$', '', regex=False)
+            ana_tablo[kolon_fiyat] = ana_tablo[kolon_fiyat].str.replace(',', '.', regex=False)
+            ana_tablo[kolon_fiyat] = pd.to_numeric(ana_tablo[kolon_fiyat], errors='coerce')
+            ana_tablo = ana_tablo.dropna(subset=[kolon_fiyat])
+            
+            st.markdown("---")
+            liste = sorted(ana_tablo['TAM_AD'].unique().tolist())
+            secilen_urun = st.selectbox("Hangi parfümü üreteceksin?", liste)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                sise_tipi = st.radio("Şişe Boyutu", ["10 ml (Tester)", "50 ml (Standart)"])
+            
+            if "10 ml" in sise_tipi:
+                sise_ml, sise_bos_maliyet = 10.0, 15.0
+            else:
+                sise_ml, sise_bos_maliyet = 50.0, 75.0
+                
+            veri = ana_tablo[ana_tablo['TAM_AD'] == secilen_urun].iloc[0]
+            dolar_kg_fiyati = veri[kolon_fiyat]
+            tl_gram_fiyati = (dolar_kg_fiyati * dolar_kuru) / 1000
+            
+            esans_ml = (sise_ml * esans_orani) / 100
+            su_ml = (sise_ml * su_orani) / 100
+            alkol_ml = sise_ml - esans_ml - su_ml
+            
+            maliyet_esans = esans_ml * tl_gram_fiyati
+            maliyet_alkol = (alkol_ml / 1000) * alkol_litre
+            maliyet_su = (su_ml / 1000) * saf_su_litre
+            maliyet_ambalaj = sise_bos_maliyet + kutu_maliyet + etiket_maliyet
+            
+            toplam_maliyet = maliyet_esans + maliyet_alkol + maliyet_su + maliyet_ambalaj
+            
+            st.markdown("---")
+            st.subheader(f"📊 {secilen_urun}")
+            st.caption(f"Hammadde: ${dolar_kg_fiyati} / KG  |  {tl_gram_fiyati:.2f} TL / Gram")
+            
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("🔸 Esans", f"{maliyet_esans:.2f} TL", f"{esans_ml} ml")
+            c2.metric("🔹 Alkol", f"{maliyet_alkol:.2f} TL", f"{alkol_ml} ml")
+            c3.metric("💧 Su", f"{maliyet_su:.2f} TL", f"{su_ml} ml")
+            c4.metric("📦 Ambalaj", f"{maliyet_ambalaj:.2f} TL", "Kutu+Etkt")
+            
+            st.success(f"💰 TOPLAM MALİYET: {toplam_maliyet:.2f} TL")
+            st.info(f"🏷️ Tavsiye Satış (x3): {toplam_maliyet*3:.2f} TL")
+            
+        else:
+            st.error("Dosya formatı uygun değil. BRAND ve FOB PRICE sütunları bulunamadı.")
